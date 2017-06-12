@@ -15,10 +15,12 @@ Open [http://localhost:8080/graphiql](http://localhost:8080/graphiql) on your br
 			_id
 			title
 			content
+			date
 			comments {
 				_id
 				content
-			} 
+				date
+			}
 		}
 	}
 	query getPost {
@@ -26,12 +28,14 @@ Open [http://localhost:8080/graphiql](http://localhost:8080/graphiql) on your br
 			_id
 			title
 			content
+			date
 		}
 	}
 	query getComment {
 		comment(_id: "593de5842a5a0184e1f3f4f5") {  # replace it with an existing ID
 			_id
 			content
+			date
 			post {
 				_id
 				title
@@ -44,17 +48,19 @@ Open [http://localhost:8080/graphiql](http://localhost:8080/graphiql) on your br
 			_id
 			title
 			content
+			date
 		}
 	}
 	mutation createComment {
 		createComment(post:"593da891a2ac8d808201566d", content:"This is a comment") {  # replace the post id with an existing ID
 			_id
+			content
 			post {
 				_id
 				title
 				content
+				date
 			}
-			content
 		}
 	}
 
