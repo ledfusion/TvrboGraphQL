@@ -75,15 +75,20 @@ function graphqlSetup() {
 				delete args.sortAscending;
 
 				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
+
 				return Post.find(args).select(selectFields).skip(skip).limit(limit).sort(sortAscending ? sortBy : `-${sortBy}`).lean().exec()
 			},
 			post: (parent, args, context, info) => {
 				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-				return Post.findById(args._id).select(selectFields).lean().exec()
+
+				if (selectFields == "_id") return { _id: args._id };
+				else return Post.findById(args._id).select(selectFields).lean().exec()
 			},
 			comment: (parent, args, context, info) => {
 				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-				return Comment.findById(args._id).select(selectFields).lean().exec()
+
+				if (selectFields == "_id") return { _id: args._id };
+				else return Comment.findById(args._id).select(selectFields).lean().exec()
 			},
 		},
 
@@ -91,13 +96,17 @@ function graphqlSetup() {
 		Post: {
 			comments: async (parent, args, context, info) => {
 				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-				return Comment.find({ post: parent._id }).select(selectFields).lean().exec();
+
+				if (selectFields == "_id") return { _id: parent.post };
+				else return Comment.find({ post: parent._id }).select(selectFields).lean().exec();
 			}
 		},
 		Comment: {
 			post: async (parent, args, context, info) => {
 				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-				return Post.findById(parent.post).select(selectFields).lean().exec();
+
+				if (selectFields == "_id") return { _id: parent.post };
+				else return Post.findById(parent.post).select(selectFields).lean().exec();
 			}
 		},
 
