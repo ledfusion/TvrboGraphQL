@@ -15,95 +15,114 @@ const MONGO_URL = 'mongodb://localhost:27017/test'
 // DB MODEL
 
 const Post = mongoose.model('Post', mongoose.Schema({
-	title: String,
-	content: String
+	title: { type: String, required: true },
+	content: String,
+	date: { type: Date, default: Date.now }
 }, { collection: 'posts' }))
 
 const Comment = mongoose.model('Comment', mongoose.Schema({
-	post: mongoose.Schema.ObjectId,
-	content: String
+	post: { type: mongoose.Schema.ObjectId, required: true },
+	content: { type: String, required: true },
+	date: { type: Date, default: Date.now }
 }, { collection: 'comments' }))
 
+// SERVER START
 
-async function start() {
-	try {
-		await mongoose.connect(MONGO_URL)
+function dbConnect() {
+	return mongoose.connect(MONGO_URL)
+}
 
-		const typeDefs = [`
+function graphqlSetup() {
+
+	const typeDefs = [`
       type Query {
+        posts(skip: Int = 0, limit: Int = 30, sortBy: String = "date", sortAscending: Boolean = true): [Post]
         post(_id: String): Post
-        posts: [Post]
         comment(_id: String): Comment
       }
       type Post {
         _id: String
         title: String
         content: String
+				date: String
         comments: [Comment]
       }
       type Comment {
         _id: String
         content: String
+				date: String
         post: Post
       }
       type Mutation {
         createPost(title: String, content: String): Post
         createComment(post: String, content: String): Comment
       }
-			
+
       schema {
         query: Query
         mutation: Mutation
       }
     `];
 
-		const resolvers = {
-			// Direct queries
-			Query: {
-				post: (parent, args, context, info) => {
-					const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-					return Post.findById(args._id).select(selectFields).lean().exec()
-				},
-				posts: (parent, args, context, info) => {
-					const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-					return Post.find(args).select(selectFields).lean().exec()
-				},
-				comment: (parent, args, context, info) => {
-					const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-					return Comment.findById(args._id).select(selectFields).lean().exec()
-				},
-			},
+	const resolvers = {
+		// Direct queries
+		Query: {
+			posts: (parent, args, context, info) => {
+				const { skip, limit, sortBy, sortAscending } = args;
+				delete args.skip;
+				delete args.limit;
+				delete args.sortBy;
+				delete args.sortAscending;
 
-			// Indirect queries
-			Post: {
-				comments: async (parent, args, context, info) => {
-					const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-					return Comment.find({ post: parent._id }).select(selectFields).lean().exec();
-				}
+				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
+				return Post.find(args).select(selectFields).skip(skip).limit(limit).sort(sortAscending ? sortBy : `-${sortBy}`).lean().exec()
 			},
-			Comment: {
-				post: async (parent, args, context, info) => {
-					const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
-					return Post.findById(parent.post).select(selectFields).lean().exec();
-				}
+			post: (parent, args, context, info) => {
+				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
+				return Post.findById(args._id).select(selectFields).lean().exec()
 			},
-
-			// Updates
-			Mutation: {
-				createPost: async (root, args, context, info) => {
-					return Post.create(args)
-				},
-				createComment: async (root, args) => {
-					return Comment.create(args)
-				},
+			comment: (parent, args, context, info) => {
+				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
+				return Comment.findById(args._id).select(selectFields).lean().exec()
 			},
-		}
+		},
 
-		const schema = makeExecutableSchema({
-			typeDefs,
-			resolvers
-		})
+		// Indirect queries
+		Post: {
+			comments: async (parent, args, context, info) => {
+				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
+				return Comment.find({ post: parent._id }).select(selectFields).lean().exec();
+			}
+		},
+		Comment: {
+			post: async (parent, args, context, info) => {
+				const selectFields = info.fieldNodes[0].selectionSet.selections.map(f => f.name.value).join(' ');
+				return Post.findById(parent.post).select(selectFields).lean().exec();
+			}
+		},
 
+		// Updates
+		Mutation: {
+			createPost: async (root, args, context, info) => {
+				return Post.create(args)
+			},
+			createComment: async (root, args) => {
+				return Comment.create(args)
+			},
+		},
+	}
+
+	return makeExecutableSchema({
+		typeDefs,
+		resolvers
+	})
+}
+
+async function serverStart() {
+	try {
+		await dbConnect()
+
+		const schema = graphqlSetup();
 
 		// SERVER
 
@@ -128,4 +147,4 @@ async function start() {
 	}
 }
 
-start();
+serverStart();
